@@ -14,8 +14,7 @@ import tempfile
 import urllib2
 
 
-def grafana_dashboard_backups(
-        elastic_host, elastic_index, elastic_port, dest_dir, debug=False):
+def grafana_dashboard_backups(elastic_url, dest_dir, debug=False):
     '''
     Saves all Grafana dashboards stored in Elasticsearch in a tarball
 
@@ -52,10 +51,8 @@ def grafana_dashboard_backups(
     # Conveniance vars
     # XXX: arbitrarily setting limit to 100, should be a scan and search if it
     # gets large
-    dashboards_url = 'http://%s:%s/%s/dashboard/_search/?size=100' % (
-        elastic_host,
-        elastic_port,
-        elastic_index)
+    dashboards_url = '{}/_search/?size=100'.format(elastic_url)
+    # dashboards_url = "http://grafana.gt.ecg.so:80/es/grafana-dash/_search/?size=100"
 
     work_tmp_dir = tempfile.mkdtemp()
     utc_datetime = datetime.datetime.utcnow()
@@ -137,23 +134,10 @@ def main():
         help='Debug output (very noisy)')
 
     parser.add_option(
-        '-e', '--grafana-elasticsearch-host',
-        dest='elastic_host',
-        help='The elastic search host FQDN used by grafana',
+        '-u', '--grafana-elasticsearch-url',
+        dest='elastic_url',
+        help='The elasticsearch url, e.g. http://hostname:9200/indexname',
         metavar='ELASTIC_SEARCH_HOST')
-
-    parser.add_option(
-        '-i', '--index',
-        dest='elastic_index',
-        help='The elasticsearch index used by Grafana',
-        metavar='ELASTIC_INDEX')
-
-    parser.add_option(
-        '-p', '--grafana-elasticsearch-port',
-        default='9200',
-        dest='elastic_port',
-        help='The elastic search port used by grafana',
-        metavar='ELASTIC_SEARCH_PORT')
 
     parser.add_option(
         '-t', '--dest-dir',
@@ -164,16 +148,13 @@ def main():
 
     (options, args) = parser.parse_args()
 
-    if not options.elastic_host:
-        parser.error('An elastic search host is required')
+    if not options.elastic_url:
+        parser.error('Elasticsearch URL is required')
 
-    elastic_host = options.elastic_host
-    elastic_index = options.elastic_index
-    elastic_port = options.elastic_port
+    elastic_url = options.elastic_url
     dest_dir = options.dest_dir
 
-    grafana_dashboard_backups(elastic_host, elastic_index, elastic_port,
-                              dest_dir, debug=options.debug)
+    grafana_dashboard_backups(elastic_url, dest_dir, debug=options.debug)
 
 if __name__ == '__main__':
     main()
