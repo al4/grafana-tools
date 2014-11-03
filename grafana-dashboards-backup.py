@@ -170,9 +170,9 @@ def main():
     elastic_host = options.elastic_host
     elastic_port = options.elastic_port
     dest_dir = options.dest_dir
-    debug = options.debug
 
-    grafana_dashboard_backups(elastic_host, elastic_port, dest_dir)
+    grafana_dashboard_backups(elastic_host, elastic_port, dest_dir,
+                              debug=options.debug)
 
 if __name__ == '__main__':
     main()
