@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#! /usr/bin/env python -tt
 
 import datetime
 import json
@@ -15,7 +15,7 @@ import urllib2
 
 
 def grafana_dashboard_backups(
-        elastic_host, elastic_port, dest_dir, debug=False):
+        elastic_host, elastic_index, elastic_port, dest_dir, debug=False):
     '''
     Saves all Grafana dashboards stored in Elasticsearch in a tarball
 
@@ -50,8 +50,13 @@ def grafana_dashboard_backups(
         return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
     # Conveniance vars
-    dashboards_url = 'http://%s:%s/grafana-dash/dashboard/_search' % (
-        elastic_host, elastic_port)
+    # XXX: arbitrarily setting limit to 100, should be a scan and search if it
+    # gets large
+    dashboards_url = 'http://%s:%s/%s/dashboard/_search/?size=100' % (
+        elastic_host,
+        elastic_port,
+        elastic_index)
+
     work_tmp_dir = tempfile.mkdtemp()
     utc_datetime = datetime.datetime.utcnow()
     formatted_time = utc_datetime.strftime("%Y-%m-%d-%H%MZ")
@@ -86,16 +91,18 @@ def grafana_dashboard_backups(
     try:
         for hit in data['hits']['hits']:
             dashboard_definition = json.loads(hit['_source']['dashboard'])
-            dashboard_file_name = os.path.join(
-                work_tmp_dir,
-                cam_case_convert(hit['_id']) + '_' + formatted_time + '.json')
-            dashboard_file = open(dashboard_file_name, 'w')
+            dashboard_file_name = cam_case_convert(hit['_id']) +\
+                '_' + formatted_time + '.json'
+            dashboard_file_path = os.path.join(
+                work_tmp_dir, dashboard_file_name)
+            dashboard_file = open(dashboard_file_path, 'w')
+
             json.dump(dashboard_definition, dashboard_file, sort_keys=True,
                       indent=2, ensure_ascii=False)
             logger.info('Added %s to the dashboards backup tarball' %
                         hit['_id'])
             dashboard_file.close()
-            tar.add(dashboard_file_name)
+            tar.add(dashboard_file_path, arcname=dashboard_file_name)
         tar.close()
     except Exception as e:
         logging.critical(e)
@@ -104,7 +111,7 @@ def grafana_dashboard_backups(
     try:
         tarball_file = os.path.basename(tarball)
         tarball_dest = os.path.join(dest_dir, tarball_file)
-        os.rename(tarball, tarball_dest)
+        shutil.move(tarball, tarball_dest)
         logger.info('New grafana dashboards backup at %s' % tarball_dest)
     except Exception as e:
         logging.critical('Failed to move tarball to %s' % dest_dir)
@@ -134,6 +141,12 @@ def main():
         dest='elastic_host',
         help='The elastic search host FQDN used by grafana',
         metavar='ELASTIC_SEARCH_HOST')
+
+    parser.add_option(
+        '-i', '--index',
+        dest='elastic_index',
+        help='The elasticsearch index used by Grafana',
+        metavar='ELASTIC_INDEX')
 
     parser.add_option(
         '-p', '--grafana-elasticsearch-port',
